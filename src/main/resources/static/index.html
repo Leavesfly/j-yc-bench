@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>j-yc-bench — AI CEO Simulation Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="logo">
+            <span class="logo-icon">🏢</span>
+            <h1>j-yc-bench</h1>
+            <span class="subtitle">AI CEO Simulation</span>
+        </div>
+        <div class="control-bar">
+            <div class="run-controls">
+                <button class="ctrl-btn ctrl-start" id="btn-start" title="启动仿真">
+                    <span class="ctrl-icon">▶</span> 启动
+                </button>
+                <button class="ctrl-btn ctrl-stop" id="btn-stop" title="中止仿真" disabled>
+                    <span class="ctrl-icon">⏹</span> 中止
+                </button>
+                <button class="ctrl-btn ctrl-restart" id="btn-restart" title="重跑仿真">
+                    <span class="ctrl-icon">🔄</span> 重跑
+                </button>
+            </div>
+            <div class="run-status-badge" id="run-status-badge">
+                <span class="status-dot"></span>
+                <span class="status-text">IDLE</span>
+            </div>
+        </div>
+        <div class="status-bar">
+            <div class="status-item" id="sim-time-display">
+                <span class="label">仿真时间</span>
+                <span class="value" id="sim-time">--</span>
+            </div>
+            <div class="status-item" id="ws-status">
+                <span class="dot dot-disconnected"></span>
+                <span class="label">实时连接</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 运行配置弹窗 -->
+    <div class="modal-overlay" id="run-modal" style="display:none">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🚀 仿真配置</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>模型 (Model)</label>
+                    <input type="text" id="input-model" value="ollama/qwen3.5:4b" placeholder="ollama/qwen3.5:4b">
+                </div>
+                <div class="form-group">
+                    <label>随机种子 (Seed)</label>
+                    <input type="number" id="input-seed" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>配置预设 (Config)</label>
+                    <input type="text" id="input-config" value="default" placeholder="default">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="ctrl-btn ctrl-cancel" id="modal-cancel">取消</button>
+                <button class="ctrl-btn ctrl-confirm" id="modal-confirm">确认启动</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="dashboard">
+        <!-- 顶部 KPI 卡片 -->
+        <section class="kpi-row">
+            <div class="kpi-card funds">
+                <div class="kpi-icon">💰</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">公司资金</span>
+                    <span class="kpi-value" id="kpi-funds">--</span>
+                    <span class="kpi-sub" id="kpi-runway">跑道: --</span>
+                </div>
+            </div>
+            <div class="kpi-card employees">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">员工</span>
+                    <span class="kpi-value" id="kpi-employees">--</span>
+                    <span class="kpi-sub" id="kpi-payroll">月工资: --</span>
+                </div>
+            </div>
+            <div class="kpi-card tasks">
+                <div class="kpi-icon">📋</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">任务</span>
+                    <span class="kpi-value" id="kpi-tasks">--</span>
+                    <span class="kpi-sub" id="kpi-tasks-detail">活跃/计划</span>
+                </div>
+            </div>
+            <div class="kpi-card prestige">
+                <div class="kpi-icon">⭐</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">声望</span>
+                    <span class="kpi-value" id="kpi-prestige">--</span>
+                    <span class="kpi-sub">四领域平均</span>
+                </div>
+            </div>
+            <div class="kpi-card results">
+                <div class="kpi-icon">🏆</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">完成率</span>
+                    <span class="kpi-value" id="kpi-success-rate">--</span>
+                    <span class="kpi-sub" id="kpi-ok-fail">成功/失败</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 主内容区 -->
+        <section class="content-grid">
+            <!-- 左列：图表区 -->
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <h2>📈 资金趋势</h2>
+                </div>
+                <div class="panel-body">
+                    <canvas id="funds-chart" width="600" height="250"></canvas>
+                </div>
+            </div>
+
+            <!-- 右列：声望雷达 -->
+            <div class="panel prestige-panel">
+                <div class="panel-header">
+                    <h2>⭐ 领域声望</h2>
+                </div>
+                <div class="panel-body prestige-grid">
+                    <div class="prestige-bar" data-domain="research">
+                        <span class="domain-label">🔬 Research</span>
+                        <div class="bar-track"><div class="bar-fill" id="bar-research"></div></div>
+                        <span class="bar-value" id="val-research">0</span>
+                    </div>
+                    <div class="prestige-bar" data-domain="inference">
+                        <span class="domain-label">🧠 Inference</span>
+                        <div class="bar-track"><div class="bar-fill" id="bar-inference"></div></div>
+                        <span class="bar-value" id="val-inference">0</span>
+                    </div>
+                    <div class="prestige-bar" data-domain="training">
+                        <span class="domain-label">🏋️ Training</span>
+                        <div class="bar-track"><div class="bar-fill" id="bar-training"></div></div>
+                        <span class="bar-value" id="val-training">0</span>
+                    </div>
+                    <div class="prestige-bar" data-domain="data">
+                        <span class="domain-label">📊 Data</span>
+                        <div class="bar-track"><div class="bar-fill" id="bar-data"></div></div>
+                        <span class="bar-value" id="val-data">0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 标签页导航 -->
+        <section class="tab-section">
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="employees">👥 员工</button>
+                <button class="tab-btn" data-tab="tasks">📋 任务</button>
+                <button class="tab-btn" data-tab="clients">🤝 客户</button>
+                <button class="tab-btn" data-tab="finance">💳 财务</button>
+                <button class="tab-btn" data-tab="market">🏪 市场</button>
+            </nav>
+
+            <!-- 员工面板 -->
+            <div class="tab-panel active" id="panel-employees">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                <th>等级</th>
+                                <th>月薪</th>
+                                <th>工时/天</th>
+                                <th>Research</th>
+                                <th>Inference</th>
+                                <th>Training</th>
+                                <th>Data</th>
+                                <th>当前任务</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employees-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 任务面板 -->
+            <div class="tab-panel" id="panel-tasks">
+                <div class="task-filters">
+                    <button class="filter-btn active" data-status="all">全部</button>
+                    <button class="filter-btn" data-status="active">进行中</button>
+                    <button class="filter-btn" data-status="planned">计划中</button>
+                    <button class="filter-btn" data-status="completed_success">已完成</button>
+                    <button class="filter-btn" data-status="completed_fail">失败</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>任务名称</th>
+                                <th>状态</th>
+                                <th>客户</th>
+                                <th>报酬</th>
+                                <th>声望要求</th>
+                                <th>进度</th>
+                                <th>截止日期</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 客户面板 -->
+            <div class="tab-panel" id="panel-clients">
+                <div class="clients-grid" id="clients-grid"></div>
+            </div>
+
+            <!-- 财务面板 -->
+            <div class="tab-panel" id="panel-finance">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>类别</th>
+                                <th>金额</th>
+                                <th>关联</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finance-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 市场面板 -->
+            <div class="tab-panel" id="panel-market">
+                <div class="market-grid" id="market-grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <span>j-yc-bench v0.1.0 — AI CEO Long-Horizon Benchmark</span>
+        <span id="last-refresh">最后刷新: --</span>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

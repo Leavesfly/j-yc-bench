@@ -1,5 +1,7 @@
 package com.collinear.ycbench.agent;
 
+import com.collinear.ycbench.Main;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -14,7 +16,7 @@ import java.util.concurrent.TimeUnit;
  * 将 {@code yc-bench ...} 作为子进程运行并规范化结果。
  *
  * <p>镜像 {@code agent/commands/executor.py + policy.py}：验证命令以 {@code yc-bench} 开头，
- * 使用简单的 shell 风格分词进行拆分，然后 fork 一个 JVM 运行 {@link com.collinear.ycbench.cli.Main}。
+ * 使用简单的 shell 风格分词进行拆分，然后 fork 一个 JVM 运行 {@link Main}。
  */
 public final class CommandExecutor {
 

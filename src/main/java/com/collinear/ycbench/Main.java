@@ -1,5 +1,6 @@
-package com.collinear.ycbench.cli;
+package com.collinear.ycbench;
 
+import com.collinear.ycbench.cli.DotEnv;
 import com.collinear.ycbench.cli.commands.ClientCmd;
 import com.collinear.ycbench.cli.commands.CompanyCmd;
 import com.collinear.ycbench.cli.commands.EmployeeCmd;
@@ -10,6 +11,7 @@ import com.collinear.ycbench.cli.commands.RunCmd;
 import com.collinear.ycbench.cli.commands.ScratchpadCmd;
 import com.collinear.ycbench.cli.commands.SimCmd;
 import com.collinear.ycbench.cli.commands.TaskCmd;
+import com.collinear.ycbench.web.WebCmd;
 import picocli.CommandLine;
 
 /**
@@ -33,7 +35,8 @@ import picocli.CommandLine;
                 ReportCmd.class,
                 ScratchpadCmd.class,
                 ClientCmd.class,
-                RunCmd.class
+                RunCmd.class,
+                WebCmd.class
         }
 )
 public final class Main implements Runnable {

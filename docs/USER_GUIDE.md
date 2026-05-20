@@ -11,12 +11,13 @@
 3. [快速开始（Ollama 本地模型）](#快速开始ollama-本地模型)
 4. [运行第一次基准测试](#运行第一次基准测试)
 5. [使用云端 API（可选）](#使用云端-api可选)
-6. [理解输出结果](#理解输出结果)
-7. [多 Seed 批量评估](#多-seed-批量评估)
-8. [查看和分析结果](#查看和分析结果)
-9. [自定义配置预设](#自定义配置预设)
-10. [使用 CLI 手动调试](#使用-cli-手动调试)
-11. [常见问题排查](#常见问题排查)
+6. [Web 交互式仪表盘](#web-交互式仪表盘)
+7. [理解输出结果](#理解输出结果)
+8. [多 Seed 批量评估](#多-seed-批量评估)
+9. [查看和分析结果](#查看和分析结果)
+10. [自定义配置预设](#自定义配置预设)
+11. [使用 CLI 手动调试](#使用-cli-手动调试)
+12. [常见问题排查](#常见问题排查)
 
 ---
 
@@ -194,6 +195,100 @@ OPENROUTER_API_KEY=sk-or-v1-...
 java -jar target/j-yc-bench.jar run \
   --model openai/gpt-4o-mini \
   --seed 1
+```
+
+---
+
+## Web 交互式仪表盘
+
+除了命令行方式，j-yc-bench 还提供了 **Web 交互式仪表盘**，让你通过浏览器直观地查看仿真状态、控制仿真运行。
+
+### 启动 Web UI
+
+```bash
+# 查看已有仿真数据（需先运行过一次仿真）
+java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db
+
+# 指定端口
+java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db --port 3000
+
+# 指定默认模型和种子（用于页面上的启动/重跑按钮）
+java -jar target/j-yc-bench.jar web \
+  --db db/default_1_ollama_qwen3.5_4b.db \
+  --model ollama/qwen3.5:4b \
+  --seed 1 \
+  --config default
+```
+
+启动后浏览器打开 `http://localhost:8080` 即可访问。
+
+### Web UI 参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--db` | `db/yc_bench.db` | SQLite 数据库文件路径 |
+| `-p, --port` | `8080` | Web 服务监听端口 |
+| `--model` | `ollama/qwen3.5:4b` | 默认 LLM 模型（供启动/重跑使用） |
+| `--seed` | `1` | 默认随机种子 |
+| `--config` | `default` | 默认配置预设 |
+
+### 功能概览
+
+Web UI 提供以下功能模块：
+
+| 模块 | 功能 |
+|------|------|
+| **📊 实时仪表盘** | 资金余额、跑道月数、员工数、任务数、声望、完成率 |
+| **⭐ 领域声望** | Research/Inference/Training/Data 四领域进度条对比 |
+| **📈 资金趋势图** | 月度资金变化曲线图 |
+| **👥 员工管理** | 技能矩阵、月薪、当前任务分配一览 |
+| **📋 任务追踪** | 按状态筛选（全部/进行中/计划中/已完成/失败），进度可视化 |
+| **🤝 客户分析** | 信任度、RAT 客户红色标记、完成/失败统计 |
+| **💳 财务流水** | 最近 50 笔收支明细 |
+| **🏪 市场浏览** | 当前可接任务卡片展示 |
+
+### 仿真控制按钮
+
+页面顶部提供三个仿真控制按钮：
+
+| 按钮 | 功能 | 说明 |
+|------|------|------|
+| **▶ 启动** | 启动新仿真 | 弹出配置弹窗，可修改模型/种子/预设后确认启动 |
+| **⏹ 中止** | 中止当前仿真 | 仿真运行中有效，发送中断信号停止 Agent 循环 |
+| **🔄 重跑** | 清除并重跑 | 删除旧数据库文件后重新启动完整仿真 |
+
+**操作流程**：
+
+1. 点击 **▶ 启动** 或 **🔄 重跑**
+2. 在弹出的配置弹窗中确认/修改参数（模型、种子、预设）
+3. 点击"确认启动"，仿真将在后台异步运行
+4. 顶部状态徽章实时显示运行状态（空闲 → 运行中 → 已完成/出错）
+5. 运行过程中页面自动刷新数据，可实时观察资金和任务变化
+6. 如需提前终止，点击 **⏹ 中止**
+
+### 实时数据推送
+
+Web UI 通过 WebSocket 连接服务端，仿真状态变更会**实时推送**到浏览器：
+
+- 仿真启动/完成/出错时，状态徽章自动切换
+- 按钮可用状态自动联动（运行中禁用启动，启用中止）
+- 仿真完成后自动刷新仪表盘数据
+
+### 典型使用场景
+
+```bash
+# 场景 1：先用 CLI 跑完仿真，再用 Web 可视化分析
+java -jar target/j-yc-bench.jar run --model ollama/qwen3.5:4b --seed 1
+java -jar target/j-yc-bench.jar web --db db/default_1_ollama_qwen3.5_4b.db
+
+# 场景 2：直接用 Web 启动和监控仿真
+java -jar target/j-yc-bench.jar web --model ollama/qwen3.5:4b --seed 1
+# 然后在浏览器中点击"启动"按钮
+
+# 场景 3：对比不同 Bot 的运行结果
+java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db --port 8081 &
+java -jar target/j-yc-bench.jar web --db db/default_1_random_bot.db --port 8082 &
+# 分别打开 localhost:8081 和 localhost:8082 对比
 ```
 
 ---

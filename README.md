@@ -63,6 +63,27 @@ prestige_bot     default      1           $216,453   55    16      3.7
 Bankruptcies: 0/4
 ```
 
+### 🌐 Web 交互式仪表盘
+
+更直观地查看仿真状态 — 资金、员工、任务、客户一目了然：
+
+```bash
+# 构建后启动 Web UI（需要先运行过一次仿真生成数据库）
+java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db
+
+# 指定端口
+java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db --port 3000
+```
+
+然后浏览器打开 `http://localhost:8080`，即可看到：
+- 📊 **实时仪表盘** — 资金、跑道、员工数、任务完成率
+- ⭐ **领域声望可视化** — 四个领域进度条对比
+- 📈 **资金趋势图表** — 月度收支可视化
+- 👥 **员工管理** — 技能雷达、薪资、任务分配
+- 📋 **任务追踪** — 按状态筛选，进度实时更新
+- 🤝 **客户分析** — 信任度、RAT 识别标记
+- 💳 **财务流水** — 完整的收支明细
+
 ### 🧠 LLM Agent 可视化演示
 
 直观看到 LLM 如何做出经营决策（需 Ollama）：
