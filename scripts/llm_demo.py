@@ -83,13 +83,16 @@ EMPLOYEES = [
 # ─── Ollama API 调用 ─────────────────────────────────────────────────────────
 
 def call_ollama(messages, model, base_url, stream=True):
-    """调用 Ollama 兼容的 OpenAI API，支持流式输出"""
-    url = f"{base_url}/chat/completions"
+    """调用 Ollama 原生 API，关闭 thinking 模式，支持流式输出"""
+    # 使用 Ollama 原生 /api/chat 接口，可传 think: false 关闭推理模式
+    ollama_base = base_url.rsplit("/v1", 1)[0]
+    url = f"{ollama_base}/api/chat"
     payload = {
         "model": model.replace("ollama/", ""),
         "messages": messages,
         "stream": stream,
-        "temperature": 0.7,
+        "think": False,
+        "options": {"temperature": 0.7},
     }
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -98,7 +101,7 @@ def call_ollama(messages, model, base_url, stream=True):
     )
 
     try:
-        resp = urllib.request.urlopen(req, timeout=120)
+        resp = urllib.request.urlopen(req, timeout=300)
     except urllib.error.URLError as e:
         print(color(f"\n❌ 无法连接 Ollama: {e}", RED, BOLD))
         print(color("   请确保 Ollama 服务正在运行: ollama serve", YELLOW))
@@ -106,24 +109,23 @@ def call_ollama(messages, model, base_url, stream=True):
 
     if not stream:
         body = json.loads(resp.read().decode("utf-8"))
-        return body["choices"][0]["message"]["content"]
+        return body.get("message", {}).get("content", "")
 
-    # 流式输出
+    # 流式输出 — Ollama 原生格式：每行一个 JSON 对象
     full_content = ""
     for line in resp:
         line = line.decode("utf-8").strip()
-        if not line or line == "data: [DONE]":
+        if not line:
             continue
-        if line.startswith("data: "):
-            line = line[6:]
         try:
             chunk = json.loads(line)
-            delta = chunk.get("choices", [{}])[0].get("delta", {})
-            content = delta.get("content", "")
+            content = chunk.get("message", {}).get("content", "")
             if content:
                 full_content += content
                 sys.stdout.write(content)
                 sys.stdout.flush()
+            if chunk.get("done", False):
+                break
         except json.JSONDecodeError:
             continue
     return full_content

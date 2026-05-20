@@ -62,40 +62,47 @@ echo ""
 echo -e "${MAGENTA}${BOLD}🧠 正在请求 LLM 决策...${NC}"
 echo -e "${DIM}────────────────────────────────────────────────────────${NC}"
 
-# 调用 Ollama API（超时 300s，本地模型推理可能较慢）
-RESPONSE=$(curl -s --max-time 300 "${BASE_URL}/v1/chat/completions" \
+# 流式调用 Ollama 原生 API — 关闭 thinking 模式，逐字输出
+echo ""
+echo -e "${GREEN}${BOLD}💬 Agent 决策（流式输出）:${NC}"
+echo -e "${DIM}────────────────────────────────────────────────────────${NC}"
+
+curl -sN --max-time 300 "${BASE_URL}/api/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "'"${MODEL}"'",
     "messages": [
       {
         "role": "system",
-        "content": "你是一个 AI 创业公司的 CEO Agent。公司有 $200,000 资金，8名员工，月薪 $38,005，跑道约5个月。你需要从市场上选择任务来赚取收入并提升声望，合理分配员工，确保公司存活一年。请用中文简洁分析并给出决策，不要输出思考过程，直接给出结论。"
+        "content": "你是一个 AI 创业公司的 CEO Agent。公司有 $200,000 资金，8名员工，月薪 $38,005，跑道约5个月。你需要从市场上选择任务来赚取收入并提升声望，合理分配员工，确保公司存活一年。请用中文简洁分析并给出决策。"
       },
       {
         "role": "user",
         "content": "当前是第1回合。公司状态：资金$200,000, 跑道5.3个月, 声望1.0, 无活跃任务。\n\n可选任务:\n1. Task-67: Helix Systems, research领域, 报酬$20,495, 声望+0.018, 工作量878\n2. Task-140: Cortex Intelligence, inference领域, 报酬$18,280, 声望+0.210, 工作量547\n3. Task-92: Cortex Intelligence, inference领域, 报酬$16,811, 声望+0.093, 工作量562\n4. Task-3: Prism Analytics, data领域, 报酬$16,353, 声望+0.160, 工作量868\n5. Task-31: Helix Systems, inference领域, 报酬$16,939, 声望+0.141, 工作量876\n\n团队:\n- Emp_1 Alice: senior/inference, 效率5.2/h\n- Emp_2 Bob: mid/data, 效率3.8/h\n- Emp_3 Carol: senior/research, 效率5.0/h\n- Emp_4 David: mid/training, 效率3.5/h\n- Emp_5 Eva: junior/inference, 效率2.1/h\n- Emp_6 Frank: senior/data, 效率4.9/h\n- Emp_7 Grace: mid/research, 效率3.6/h\n- Emp_8 Henry: junior/training, 效率2.0/h\n\n请分析并决策：接哪个任务？分配哪些员工？为什么？"
       }
     ],
-    "temperature": 0.7,
-    "stream": false
-  }')
-
-# 提取并展示回答
-CONTENT=$(echo "$RESPONSE" | python3 -c "
+    "think": false,
+    "stream": true,
+    "options": {"temperature": 0.7}
+  }' 2>/dev/null | python3 -c "
 import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data['choices'][0]['message']['content'])
-except Exception as e:
-    print(f'解析失败: {e}')
-    print(sys.stdin.read()[:500])
-" 2>/dev/null || echo "解析失败，请检查 Ollama 是否正常运行")
 
-echo ""
-echo -e "${GREEN}${BOLD}💬 Agent 决策:${NC}"
-echo -e "${DIM}────────────────────────────────────────────────────────${NC}"
-echo "$CONTENT"
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        chunk = json.loads(line)
+        content = chunk.get('message', {}).get('content', '')
+        if content:
+            print(content, end='', flush=True)
+        if chunk.get('done', False):
+            break
+    except (json.JSONDecodeError, KeyError):
+        continue
+print()
+"
+
 echo -e "${DIM}────────────────────────────────────────────────────────${NC}"
 
 echo ""
