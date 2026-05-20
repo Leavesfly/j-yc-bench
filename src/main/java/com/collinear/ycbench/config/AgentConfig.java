@@ -2,7 +2,8 @@ package com.collinear.ycbench.config;
 
 /** 镜像 {@code config/schema.py} 中的 {@code AgentConfig}。*/
 public final class AgentConfig {
-    public String model = "openrouter/z-ai/glm-5";
+    public String model = "ollama/qwen3.5:4b";
+    public String baseUrl = "http://localhost:11434/v1";
     public double temperature = 0.0;
     public double topP = 1.0;
     public double requestTimeoutSeconds = 300.0;

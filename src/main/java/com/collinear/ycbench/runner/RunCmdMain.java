@@ -60,24 +60,29 @@ public final class RunCmdMain {
         System.setProperty("YC_BENCH_EXPERIMENT", args.configName);
 
         ExperimentConfig cfg = ConfigLoader.load(args.configName);
-        // CLI --model always overrides the experiment's agent model.
-        cfg.agent.model = args.model;
+        // CLI --model overrides the experiment's agent model (if provided).
+        if (args.model != null && !args.model.isEmpty()) {
+            cfg.agent.model = args.model;
+        }
+        String effectiveModel = cfg.agent.model;
+        // 确保 args.model 始终有值，供后续辅助方法使用
+        args.model = effectiveModel;
         int horizonYears = args.horizonYears != null ? args.horizonYears : cfg.sim.horizonYears;
 
         LOGGER.info(String.format(
                 "YC-Bench starting: experiment=%s model=%s seed=%d horizon=%dy max_episodes=%d",
-                cfg.name, args.model, args.seed, horizonYears, args.maxEpisodes));
+                cfg.name, effectiveModel, args.seed, horizonYears, args.maxEpisodes));
 
         RuntimeSettings settings = new RuntimeSettings(
-                cfg.agent.model, cfg.agent.temperature, cfg.agent.topP,
+                cfg.agent.model, cfg.agent.baseUrl, cfg.agent.temperature, cfg.agent.topP,
                 cfg.agent.requestTimeoutSeconds, cfg.agent.retryMaxAttempts,
                 cfg.agent.retryBackoffSeconds, cfg.agent.historyKeepRounds,
                 cfg.agent.systemPrompt);
         CommandExecutor cmdExec = new CommandExecutor((long) cfg.agent.requestTimeoutSeconds);
         AgentRuntime runtime = new HttpLlmRuntime(settings, cmdExec);
 
-        String sessionId = "run-" + args.seed + "-" + args.model;
-        RunState runState = new RunState(sessionId, args.seed, args.model, horizonYears);
+        String sessionId = "run-" + args.seed + "-" + effectiveModel;
+        RunState runState = new RunState(sessionId, args.seed, effectiveModel, horizonYears);
 
         String carriedScratchpad = "";
         UUID lastCompanyId = null;

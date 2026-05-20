@@ -34,6 +34,7 @@
 
 - JDK 11+
 - Maven 3.6+
+- [Ollama](https://ollama.com)（默认本地 LLM 运行时，开箱即用）
 
 ### 构建
 
@@ -43,9 +44,62 @@ mvn -DskipTests package
 
 产出 `target/j-yc-bench.jar`（self-contained fat JAR，含所有依赖）。
 
-### 配置 API Key
+### 30 秒体验（无需 LLM）
 
-在项目根目录创建 `.env` 文件（启动时自动加载），或通过环境变量设置：
+```bash
+# 构建后直接运行演示 — 4 种 Bot 策略对比
+./scripts/demo.sh
+```
+
+输出示例：
+```
+Bot              Config       Seed   Final Balance   OK  Fail  Prestige
+----------------------------------------------------------------------
+greedy_bot       default      1           $621,531   63    13      5.0
+random_bot       default      1           $387,144   75    11      3.0
+throughput_bot   default      1           $376,380   58    10      2.7
+prestige_bot     default      1           $216,453   55    16      3.7
+
+Bankruptcies: 0/4
+```
+
+### 🧠 LLM Agent 可视化演示
+
+直观看到 LLM 如何做出经营决策（需 Ollama）：
+
+```bash
+# 单回合决策演示 — 看 AI 如何分析市场并选择任务
+bash scripts/llm_single_turn.sh
+
+# 多回合可视化 — 带彩色终端的完整经营演示（Python 3.7+）
+python3 scripts/llm_demo.py --turns 3
+
+# 使用其他模型
+python3 scripts/llm_demo.py --model qwen3.5:32b --turns 5
+```
+
+### 开箱即用（Ollama 本地模型）
+
+项目默认使用 Ollama 本地模型 `qwen3.5:4b`，**无需 API Key**，只需安装并启动 Ollama：
+
+```bash
+# 1. 安装 Ollama（如已安装则跳过）
+# macOS: brew install ollama
+# Linux: curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. 拉取默认模型
+ollama pull qwen3.5:4b
+
+# 3. 启动 Ollama 服务（如未运行）
+ollama serve
+
+# 4. 直接运行基准测试 — 无需任何额外配置！
+java -jar target/j-yc-bench.jar run --seed 1
+```
+
+### 使用云端 API（可选）
+
+如需使用 OpenAI、Anthropic 等云端模型，在项目根目录创建 `.env` 文件：
 
 ```bash
 # .env
@@ -55,7 +109,7 @@ GEMINI_API_KEY=AIza...
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-### 运行一次基准测试
+然后通过 `--model` 指定模型：
 
 ```bash
 java -jar target/j-yc-bench.jar run \
@@ -68,8 +122,8 @@ java -jar target/j-yc-bench.jar run \
 
 | 参数 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
-| `--model` | ✓ | — | LLM 模型标识符（如 `openai/gpt-4o`、`anthropic/claude-3-5-sonnet`、`openrouter/...`） |
-| `--seed` | ✓ | — | 任务市场随机种子（员工和客户始终用固定 seed=1） |
+| `--model` | | `ollama/qwen3.5:4b` | LLM 模型标识符（如 `ollama/qwen3.5:4b`、`openai/gpt-4o`、`anthropic/claude-3-5-sonnet`） |
+| `--seed` | | `1` | 任务市场随机种子（员工和客户始终用固定 seed=1） |
 | `--config` | | `default` | 预设名（内置 `default`）或 `.yaml` 文件路径 |
 | `--horizon-years` | | 1 | 仿真时长（年） |
 | `--company-name` | | `BenchCo` | 公司名（仅显示用） |
@@ -79,12 +133,13 @@ java -jar target/j-yc-bench.jar run \
 
 ### 支持的模型 Provider
 
-| Provider | 模型前缀 | 环境变量 |
-|----------|---------|---------|
-| OpenAI | `openai/*` | `OPENAI_API_KEY` |
-| Anthropic | `anthropic/*` | `ANTHROPIC_API_KEY` |
-| Google Gemini | `gemini/*` | `GEMINI_API_KEY` |
-| OpenRouter | `openrouter/*` | `OPENROUTER_API_KEY` |
+| Provider | 模型前缀 | 环境变量 | 说明 |
+|----------|---------|---------|------|
+| **Ollama（默认）** | `ollama/*` | 无需 | 本地运行，开箱即用 |
+| OpenAI | `openai/*` | `OPENAI_API_KEY` | |
+| Anthropic | `anthropic/*` | `ANTHROPIC_API_KEY` | |
+| Google Gemini | `gemini/*` | `GEMINI_API_KEY` | |
+| OpenRouter | `openrouter/*` | `OPENROUTER_API_KEY` | |
 
 ## 输出文件
 
@@ -270,10 +325,14 @@ j-yc-bench/
 
 ## 配置预设
 
-默认预设位于 `src/main/resources/presets/default.yaml`。关键参数：
+默认预设位于 `src/main/resources/presets/default.yaml`。默认使用 Ollama 本地模型 `qwen3.5:4b`（`http://localhost:11434/v1`），无需配置任何 API Key 即可运行。
+
+关键参数：
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
+| `agent.model` | `ollama/qwen3.5:4b` | 默认 LLM 模型 |
+| `agent.base_url` | `http://localhost:11434/v1` | Ollama 服务地址 |
 | `initial_funds_cents` | 20,000,000 | 启动资金（$200K） |
 | `num_employees` | 8 | 员工数量 |
 | `num_clients` | 6 | 客户数量 |

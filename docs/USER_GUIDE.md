@@ -8,14 +8,15 @@
 
 1. [环境准备](#环境准备)
 2. [构建项目](#构建项目)
-3. [配置 API Key](#配置-api-key)
+3. [快速开始（Ollama 本地模型）](#快速开始ollama-本地模型)
 4. [运行第一次基准测试](#运行第一次基准测试)
-5. [理解输出结果](#理解输出结果)
-6. [多 Seed 批量评估](#多-seed-批量评估)
-7. [查看和分析结果](#查看和分析结果)
-8. [自定义配置预设](#自定义配置预设)
-9. [使用 CLI 手动调试](#使用-cli-手动调试)
-10. [常见问题排查](#常见问题排查)
+5. [使用云端 API（可选）](#使用云端-api可选)
+6. [理解输出结果](#理解输出结果)
+7. [多 Seed 批量评估](#多-seed-批量评估)
+8. [查看和分析结果](#查看和分析结果)
+9. [自定义配置预设](#自定义配置预设)
+10. [使用 CLI 手动调试](#使用-cli-手动调试)
+11. [常见问题排查](#常见问题排查)
 
 ---
 
@@ -27,14 +28,25 @@
 |------|---------|------|
 | JDK | 11+ | 推荐 OpenJDK 11 或 17 |
 | Maven | 3.6+ | 用于构建项目 |
-| 磁盘空间 | ~500MB | 含依赖下载 + SQLite 数据库 |
-| 网络 | 可访问 LLM API | OpenAI / Anthropic / Gemini / OpenRouter |
+| Ollama | 最新版 | 本地 LLM 运行时（默认，免费） |
+| 磁盘空间 | ~5GB | 含模型文件 + 依赖 + SQLite 数据库 |
 
 ### 验证环境
 
 ```bash
-java -version    # 确认 >= 11
-mvn -version     # 确认 >= 3.6
+java -version     # 确认 >= 11
+mvn -version      # 确认 >= 3.6
+ollama --version  # 确认已安装
+```
+
+### 安装 Ollama
+
+```bash
+# macOS
+brew install ollama
+
+# Linux
+curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ---
@@ -57,68 +69,69 @@ java -jar target/j-yc-bench.jar --version
 
 ---
 
-## 配置 API Key
+## 快速开始（Ollama 本地模型）
 
-j-yc-bench 支持 4 个 LLM 提供商，通过环境变量配置 API Key。
+项目默认使用 **Ollama** 本地运行的 `qwen3.5:4b` 模型，**无需 API Key、无需网络**，开箱即用。
 
-### 方式一：`.env` 文件（推荐）
-
-在项目根目录创建 `.env` 文件：
+### 第 1 步：拉取模型
 
 ```bash
-# 按需配置，只需要你实际使用的 provider
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-api03-...
-GEMINI_API_KEY=AIzaSy...
-OPENROUTER_API_KEY=sk-or-v1-...
+ollama pull qwen3.5:4b
 ```
 
-程序启动时会自动从当前目录或父目录查找并加载 `.env`。
-
-### 方式二：环境变量
+### 第 2 步：启动 Ollama 服务
 
 ```bash
-export OPENAI_API_KEY="sk-proj-..."
+ollama serve
 ```
 
-### Provider 与模型名对应关系
+> 如果 Ollama 已在后台运行（macOS 安装后默认自动启动），可跳过此步。
 
-| 你想用的模型 | `--model` 参数写法 | 需要的环境变量 |
-|------------|-------------------|--------------|
-| GPT-4o | `openai/gpt-4o` | `OPENAI_API_KEY` |
-| GPT-4o-mini | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
-| Claude 3.5 Sonnet | `anthropic/claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
-| Claude 3 Haiku | `anthropic/claude-3-haiku-20240307` | `ANTHROPIC_API_KEY` |
-| Gemini 2.0 Flash | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
-| 通过 OpenRouter 路由 | `openrouter/anthropic/claude-3.5-sonnet` | `OPENROUTER_API_KEY` |
+### 第 3 步：验证服务正常
+
+```bash
+curl -s http://localhost:11434/v1/models | head -5
+```
+
+看到模型列表输出即表示服务正常。
 
 ---
 
 ## 运行第一次基准测试
 
-### 最简命令
+### 最简命令（零配置）
 
 ```bash
-java -jar target/j-yc-bench.jar run \
-  --model openai/gpt-4o-mini \
-  --seed 1 \
-  --config default
+java -jar target/j-yc-bench.jar run --seed 1
 ```
 
 这会启动一次完整的基准测试：
-- Agent（由 `gpt-4o-mini` 驱动）将接管一家 AI 公司
+- Agent（由本地 `qwen3.5:4b` 驱动）将接管一家 AI 公司
 - 仿真从 2025-01-01 开始，持续 1 年
 - 公司有 $200,000 启动资金、8 名员工、6 个客户
+- **无需任何 API Key 或网络连接**
+
+### 使用其他 Ollama 模型
+
+```bash
+# 使用更大的模型获得更好效果
+ollama pull qwen3.5:32b
+java -jar target/j-yc-bench.jar run --model ollama/qwen3.5:32b --seed 1
+
+# 使用 llama 系列
+ollama pull llama3.1:8b
+java -jar target/j-yc-bench.jar run --model ollama/llama3.1:8b --seed 1
+```
 
 ### 运行时间预估
 
 | 模型 | 平均回合数 | 大致耗时 |
 |------|-----------|---------|
-| gpt-4o-mini | 50~80 | 10~20 分钟 |
-| gpt-4o | 50~80 | 15~30 分钟 |
-| claude-3.5-sonnet | 50~80 | 15~30 分钟 |
+| ollama/qwen3.5:4b | 50~80 | 20~40 分钟 |
+| ollama/qwen3.5:32b | 50~80 | 40~90 分钟 |
+| openai/gpt-4o-mini | 50~80 | 10~20 分钟 |
 
-实际耗时取决于 API 响应速度和 Agent 的决策复杂度。
+实际耗时取决于本地硬件性能（GPU 加速可大幅缩短）。
 
 ### 全部参数说明
 
@@ -128,8 +141,8 @@ java -jar target/j-yc-bench.jar run --help
 
 | 参数 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
-| `--model` | ✓ | — | LLM 模型标识符 |
-| `--seed` | ✓ | — | 任务市场随机种子 |
+| `--model` | | `ollama/qwen3.5:4b` | LLM 模型标识符 |
+| `--seed` | | `1` | 任务市场随机种子 |
 | `--config` | | `default` | 预设名或 YAML 文件路径 |
 | `--horizon-years` | | 1 | 仿真年数 |
 | `--company-name` | | `BenchCo` | 公司名（仅显示） |
@@ -144,7 +157,43 @@ java -jar target/j-yc-bench.jar run --help
 如果想重新开始，需要先删除对应的数据库文件：
 
 ```bash
-rm db/default_1_openai_gpt-4o-mini.db*
+rm db/default_1_ollama_qwen3.5:4b.db*
+```
+
+---
+
+## 使用云端 API（可选）
+
+如果你更倾向于使用 OpenAI、Anthropic 等云端模型，可配置 API Key 后通过 `--model` 指定。
+
+### 配置 API Key
+
+在项目根目录创建 `.env` 文件：
+
+```bash
+# 按需配置，只需要你实际使用的 provider
+OPENAI_API_KEY=sk-proj-...
+ANTHROPIC_API_KEY=sk-ant-api03-...
+GEMINI_API_KEY=AIzaSy...
+OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+### Provider 与模型名对应关系
+
+| Provider | `--model` 写法 | 需要的环境变量 |
+|----------|---------------|--------------|
+| **Ollama（默认）** | `ollama/qwen3.5:4b` | 无需 |
+| OpenAI | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic/claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
+| Google Gemini | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
+| OpenRouter | `openrouter/anthropic/claude-3.5-sonnet` | `OPENROUTER_API_KEY` |
+
+### 使用云端模型运行
+
+```bash
+java -jar target/j-yc-bench.jar run \
+  --model openai/gpt-4o-mini \
+  --seed 1
 ```
 
 ---

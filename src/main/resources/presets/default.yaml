@@ -5,7 +5,8 @@ name: default
 description: "1-year benchmark. Tests employee efficiency, client trust, and adversarial client detection."
 
 agent:
-  model: "openrouter/z-ai/glm-5"
+  model: "ollama/qwen3.5:4b"
+  base_url: "http://localhost:11434/v1"
   temperature: 0.0
   top_p: 1.0
   request_timeout_seconds: 300.0

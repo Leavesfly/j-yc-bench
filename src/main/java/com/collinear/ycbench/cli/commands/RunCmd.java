@@ -12,11 +12,11 @@ import java.util.concurrent.Callable;
         description = "端到端驱动完整的 agent 基准测试运行。")
 public final class RunCmd implements Callable<Integer> {
 
-    @CommandLine.Option(names = "--model", required = true,
-            description = "LLM 模型标识符（例如 openai/gpt-4o、anthropic/claude-3-5-sonnet、openrouter/...）")
+    @CommandLine.Option(names = "--model",
+            description = "LLM 模型标识符（例如 ollama/qwen3.5:4b、openai/gpt-4o）。默认使用配置文件中的值。")
     String model;
 
-    @CommandLine.Option(names = "--seed", required = true, description = "运行种子（确定性）。")
+    @CommandLine.Option(names = "--seed", defaultValue = "1", description = "运行种子（确定性）。默认为 1。")
     long seed;
 
     @CommandLine.Option(names = "--horizon-years",

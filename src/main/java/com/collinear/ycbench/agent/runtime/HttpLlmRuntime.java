@@ -385,12 +385,18 @@ public final class HttpLlmRuntime implements AgentRuntime {
         if (p.equals("openrouter")) return model.substring(slash + 1);
         if (p.equals("anthropic")) return model.substring(slash + 1);
         if (p.equals("gemini") || p.equals("google")) return model.substring(slash + 1);
+        if (p.equals("ollama")) return model.substring(slash + 1);
         return model;     // openai/foo → 原样发送
     }
 
-    private static String openAiEndpoint(String model) {
+    private String openAiEndpoint(String model) {
         String env = System.getenv("OPENAI_BASE_URL");
         if (env != null && !env.isEmpty()) return env + "/chat/completions";
+        if (model.startsWith("ollama/")) {
+            String base = settings.baseUrl != null && !settings.baseUrl.isEmpty()
+                    ? settings.baseUrl : "http://localhost:11434/v1";
+            return base + "/chat/completions";
+        }
         if (model.startsWith("openrouter/")) {
             return "https://openrouter.ai/api/v1/chat/completions";
         }
@@ -402,6 +408,10 @@ public final class HttpLlmRuntime implements AgentRuntime {
 
     private static Map<String, String> openAiAuth(String model) {
         Map<String, String> h = new LinkedHashMap<>();
+        if (model.startsWith("ollama/")) {
+            // Ollama 本地运行，无需 API Key
+            return h;
+        }
         String key;
         if (model.startsWith("openrouter/")) {
             key = firstNonEmpty(System.getenv("OPENROUTER_API_KEY"), System.getenv("OPENAI_API_KEY"));
