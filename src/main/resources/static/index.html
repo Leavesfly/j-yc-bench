@@ -51,8 +51,24 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
+                    <label>运行模式</label>
+                    <div class="mode-toggle">
+                        <button type="button" class="mode-btn active" id="mode-llm" data-mode="llm">🧠 LLM Agent</button>
+                        <button type="button" class="mode-btn" id="mode-bot" data-mode="bot">🤖 Bot 策略 (无需模型)</button>
+                    </div>
+                </div>
+                <div class="form-group" id="group-model">
                     <label>模型 (Model)</label>
                     <input type="text" id="input-model" value="ollama/qwen3.5:4b" placeholder="ollama/qwen3.5:4b">
+                </div>
+                <div class="form-group" id="group-bot" style="display:none">
+                    <label>Bot 策略</label>
+                    <select id="input-bot">
+                        <option value="greedy">🏆 Greedy — 总是接最贵的任务</option>
+                        <option value="random">🎲 Random — 随机选择任务</option>
+                        <option value="throughput">⚡ Throughput — 性价比最高</option>
+                        <option value="prestige">⭐ Prestige — 先刷声望再赚钱</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>随机种子 (Seed)</label>
@@ -154,6 +170,27 @@
                         <span class="bar-value" id="val-data">0</span>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- 实时事件流 -->
+        <section class="panel activity-panel" id="activity-panel">
+            <div class="panel-header">
+                <h2><span id="activity-indicator">⚪</span> 运行状态</h2>
+                <div class="activity-meta" id="activity-meta" style="display:none">
+                    <span id="activity-turn">回合: --</span>
+                    <span id="activity-sim-time">仿真时间: --</span>
+                    <span id="activity-funds">资金: --</span>
+                    <button class="ctrl-btn" id="btn-clear-log" style="padding:4px 8px;font-size:11px">清空</button>
+                </div>
+            </div>
+            <div class="panel-body activity-body">
+                <div class="activity-empty" id="activity-empty">
+                    <div class="empty-icon">🎮</div>
+                    <div class="empty-text">点击上方 <strong>▶ 启动</strong> 按钮开始仿真</div>
+                    <div class="empty-hint">支持 LLM Agent 或 Bot 策略（无需模型）两种运行模式</div>
+                </div>
+                <div class="activity-feed" id="activity-feed" style="display:none"></div>
             </div>
         </section>
 

@@ -108,20 +108,42 @@ public final class BotRunner {
         }
     }
 
-    static final class RunResult {
-        String config;
-        long seed;
-        String bot;
-        int turns;
-        long finalBalanceCents;
-        boolean bankrupt;
-        int tasksCompleted;
-        int tasksFailed;
-        double maxPrestige;
-        String resultPath;
+    public static final class RunResult {
+        public String config;
+        public long seed;
+        public String bot;
+        public int turns;
+        public long finalBalanceCents;
+        public boolean bankrupt;
+        public int tasksCompleted;
+        public int tasksFailed;
+        public double maxPrestige;
+        public String resultPath;
     }
 
     private BotRunner() { }
+
+    /**
+     * 公共入口：按名称运行指定 Bot 策略。供 Web 控制器等外部调用。
+     * @param botName Bot 名称: greedy, random, throughput, prestige
+     * @param configName 配置预设名
+     * @param seed 随机种子
+     * @return 运行结果，包含最终余额、完成数等
+     */
+    public static RunResult runByName(String botName, String configName, long seed) throws Exception {
+        Object[] entry = STRATEGIES.get(botName);
+        if (entry == null) {
+            throw new IllegalArgumentException("Unknown bot: " + botName + ". Available: " + STRATEGIES.keySet());
+        }
+        String slug = (String) entry[0];
+        StrategyFn strategy = (StrategyFn) entry[1];
+        return runBot(configName, seed, slug, strategy);
+    }
+
+    /** 返回所有可用的 Bot 策略名称列表 */
+    public static java.util.Set<String> availableBots() {
+        return STRATEGIES.keySet();
+    }
 
     // ---------------------------------------------------------------
     // 策略 — 候选列表上的纯函数。

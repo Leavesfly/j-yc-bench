@@ -14,6 +14,7 @@
         initTabs();
         initTaskFilters();
         initRunControls();
+        initActivityClear();
         connectWebSocket();
         loadDashboard();
         loadRunStatus();
@@ -21,6 +22,8 @@
     });
 
     // ============ Run Controls ============
+    let currentMode = 'llm'; // 'llm' or 'bot'
+
     function initRunControls() {
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
@@ -30,7 +33,7 @@
         const modalCancel = document.getElementById('modal-cancel');
         const modalConfirm = document.getElementById('modal-confirm');
 
-        let pendingAction = null; // 'start' or 'restart'
+        let pendingAction = null;
 
         btnStart.addEventListener('click', () => { pendingAction = 'start'; showModal(); });
         btnRestart.addEventListener('click', () => { pendingAction = 'restart'; showModal(); });
@@ -42,9 +45,18 @@
             if (pendingAction === 'start') startRun();
             else if (pendingAction === 'restart') restartRun();
         });
-
-        // 点击遮罩关闭
         modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+
+        // 模式切换
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.getAttribute('data-mode');
+                document.getElementById('group-model').style.display = currentMode === 'llm' ? 'block' : 'none';
+                document.getElementById('group-bot').style.display = currentMode === 'bot' ? 'block' : 'none';
+            });
+        });
     }
 
     function showModal() {
@@ -61,7 +73,7 @@
                 method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
             });
             const data = await resp.json();
-            if (resp.ok) updateRunUI(data.status);
+            if (resp.ok) { clearActivityFeed(); updateRunUI(data.status); }
             else alert(data.error || 'Start failed');
         } catch(e) { alert('Request failed: ' + e.message); }
     }
@@ -84,17 +96,23 @@
                 method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
             });
             const data = await resp.json();
-            if (resp.ok) updateRunUI(data.status);
+            if (resp.ok) { clearActivityFeed(); updateRunUI(data.status); }
             else alert(data.error || 'Restart failed');
         } catch(e) { alert('Request failed: ' + e.message); }
     }
 
     function getRunParams() {
-        return {
-            model: document.getElementById('input-model').value.trim() || 'ollama/qwen3.5:4b',
+        const params = {
+            mode: currentMode,
             seed: parseInt(document.getElementById('input-seed').value) || 1,
             config: document.getElementById('input-config').value.trim() || 'default'
         };
+        if (currentMode === 'bot') {
+            params.bot = document.getElementById('input-bot').value;
+        } else {
+            params.model = document.getElementById('input-model').value.trim() || 'ollama/qwen3.5:4b';
+        }
+        return params;
     }
 
     async function loadRunStatus() {
@@ -107,7 +125,58 @@
             if (data.model) document.getElementById('input-model').value = data.model;
             if (data.seed) document.getElementById('input-seed').value = data.seed;
             if (data.config) document.getElementById('input-config').value = data.config;
+
+            // 刷新后恢复活动面板状态
+            const runStatus = (data.status || '').toUpperCase();
+            if (runStatus === 'RUNNING' || runStatus === 'COMPLETED' || runStatus === 'ERROR') {
+                showActivityPanel();
+                const mode = data.currentMode || '';
+                const bot = data.currentBot || '';
+                const model = data.currentModel || '';
+                const elapsed = data.startTimeMs > 0 ? Math.round((Date.now() - data.startTimeMs) / 1000) : 0;
+                const feed = document.getElementById('activity-feed');
+                if (feed && feed.children.length === 0) {
+                    // 注入一条恢复提示事件
+                    const el = document.createElement('div');
+                    el.className = 'event-item status-change';
+                    if (runStatus === 'RUNNING') {
+                        const desc = mode === 'bot' ? `Bot "${bot}"` : `LLM "${model}"`;
+                        el.innerHTML = `<div class="event-header">
+                            <span class="event-title">🟢 ${desc} 运行中</span>
+                            <span class="event-time">已运行 ${formatElapsed(elapsed)}</span>
+                        </div>`;
+                    } else if (runStatus === 'COMPLETED') {
+                        const desc = mode === 'bot' ? `Bot "${bot}"` : `LLM "${model}"`;
+                        el.innerHTML = `<div class="event-header">
+                            <span class="event-title">🏁 ${desc} 已完成</span>
+                            <span class="event-time">退出码: ${data.lastExitCode}</span>
+                        </div>`;
+                        hideActivityRunning();
+                        const indicator = document.getElementById('activity-indicator');
+                        indicator.textContent = '✅';
+                    } else if (runStatus === 'ERROR') {
+                        el.innerHTML = `<div class="event-header">
+                            <span class="event-title">❌ 运行出错</span>
+                            <span class="event-time">${esc(data.lastError || '')}</span>
+                        </div>`;
+                        hideActivityRunning();
+                        const indicator = document.getElementById('activity-indicator');
+                        indicator.textContent = '❌';
+                    }
+                    feed.prepend(el);
+                }
+                // 运行中时保持运行指示
+                if (runStatus !== 'RUNNING') {
+                    hideActivityRunning();
+                }
+            }
         } catch(e) { /* ignore */ }
+    }
+
+    function formatElapsed(seconds) {
+        if (seconds < 60) return seconds + '秒';
+        if (seconds < 3600) return Math.floor(seconds / 60) + '分' + (seconds % 60) + '秒';
+        return Math.floor(seconds / 3600) + '时' + Math.floor((seconds % 3600) / 60) + '分';
     }
 
     function updateRunUI(runStatus) {
@@ -145,10 +214,15 @@
                     renderDashboard(data.payload);
                 } else if (data.type === 'run_status') {
                     updateRunUI(data.status);
-                    // 仿真完成后自动刷新数据
+                    appendActivityEvent(data);
                     if (data.status === 'COMPLETED' || data.status === 'ERROR') {
                         setTimeout(loadDashboard, 1000);
                     }
+                } else if (data.type === 'turn_start') {
+                    showActivityPanel();
+                    appendTurnStartEvent(data);
+                } else if (data.type === 'turn_end') {
+                    appendTurnEndEvent(data);
                 }
             } catch(e) { /* ignore */ }
         };
@@ -236,8 +310,10 @@
             ? `跑道: ${d.runwayMonths} 个月` : '跑道: ∞';
         document.getElementById('kpi-employees').textContent = d.employeeCount;
         document.getElementById('kpi-payroll').textContent = '月工资: ' + (d.monthlyPayrollFormatted || formatMoney(d.monthlyPayrollCents));
-        document.getElementById('kpi-tasks').textContent = (d.activeTasks + d.plannedTasks);
-        document.getElementById('kpi-tasks-detail').textContent = `活跃${d.activeTasks} / 计划${d.plannedTasks}`;
+        const totalDone = (d.completedSuccess || 0) + (d.completedFail || 0);
+        const totalAll = totalDone + (d.activeTasks || 0) + (d.plannedTasks || 0);
+        document.getElementById('kpi-tasks').textContent = totalAll > 0 ? totalDone + '/' + totalAll : (d.activeTasks + d.plannedTasks);
+        document.getElementById('kpi-tasks-detail').textContent = d.activeTasks > 0 ? `进行中${d.activeTasks}` : (totalDone > 0 ? `完成${totalDone}项` : `活跃/计划`);
 
         // Prestige
         const prestige = d.prestige || {};
@@ -453,6 +529,159 @@
                 loadTasks();
             });
         });
+    }
+
+    // ============ Activity Feed ============
+    function clearActivityFeed() {
+        const feed = document.getElementById('activity-feed');
+        if (feed) feed.innerHTML = '';
+        // 重置 meta 信息
+        const turnEl = document.getElementById('activity-turn');
+        const timeEl = document.getElementById('activity-sim-time');
+        const fundsEl = document.getElementById('activity-funds');
+        if (turnEl) turnEl.textContent = '回合: --';
+        if (timeEl) timeEl.textContent = '仿真时间: --';
+        if (fundsEl) fundsEl.textContent = '资金: --';
+    }
+
+    function showActivityPanel() {
+        document.getElementById('activity-empty').style.display = 'none';
+        document.getElementById('activity-feed').style.display = 'flex';
+        document.getElementById('activity-meta').style.display = 'flex';
+        const indicator = document.getElementById('activity-indicator');
+        indicator.textContent = '🔴';
+        indicator.classList.add('running');
+    }
+
+    function hideActivityRunning() {
+        const indicator = document.getElementById('activity-indicator');
+        indicator.classList.remove('running');
+    }
+
+    function appendTurnStartEvent(data) {
+        const feed = document.getElementById('activity-feed');
+        const el = document.createElement('div');
+        el.className = 'event-item turn-start';
+        el.innerHTML = `<div class="event-header">
+            <span class="event-title">🚀 回合 ${data.turn} 开始</span>
+            <span class="event-time">${fmtTime(data.timestamp)}</span>
+        </div>`;
+        feed.prepend(el);
+        trimFeed(feed);
+        updateActivityMeta({turn: data.turn});
+    }
+
+    function appendTurnEndEvent(data) {
+        const feed = document.getElementById('activity-feed');
+        const snap = data.snapshot || {};
+        const cmds = data.commands || [];
+
+        // 如果是终态（Bot完成或LLM完成），渲染运行摘要卡片
+        if (data.terminal) {
+            const isBankrupt = data.terminalReason === 'bankruptcy' || data.terminalReason === 'bankrupt';
+            const el = document.createElement('div');
+            el.className = 'event-item run-summary' + (isBankrupt ? ' bankrupt' : '');
+            el.innerHTML = `<div class="event-header">
+                <span class="event-title">${isBankrupt ? '💀 仿真结束 — 破产' : '🎉 仿真完成'}</span>
+                <span class="event-time">${fmtTime(data.timestamp)}</span>
+            </div>
+            <div class="summary-grid">
+                <div class="summary-stat">
+                    <div class="stat-value">${data.turn}</div>
+                    <div class="stat-label">总回合</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" style="color:${isBankrupt ? 'var(--red)' : 'var(--green)'}">${formatMoney(snap.fundsCents)}</div>
+                    <div class="stat-label">最终资金</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value">${snap.simTime ? snap.simTime.substring(0,10) : '--'}</div>
+                    <div class="stat-label">结束时间</div>
+                </div>
+            </div>
+            ${cmds.length > 0 ? '<div class="event-body" style="margin-top:8px;font-size:11px;color:var(--text-dim)">' + esc(cmds[0].result || '') + '</div>' : ''}`;
+            feed.prepend(el);
+            hideActivityRunning();
+            const indicator = document.getElementById('activity-indicator');
+            indicator.textContent = isBankrupt ? '💀' : '✅';
+        } else {
+            // 正常回合结束：渲染命令列表
+            cmds.forEach(cmd => {
+                const cmdEl = document.createElement('div');
+                cmdEl.className = 'event-item cmd';
+                cmdEl.innerHTML = `<div class="event-body">
+                    <span class="cmd-text">$ ${esc(cmd.command)}</span>
+                    ${cmd.result ? '<br><span class="result-text">' + esc(cmd.result) + '</span>' : ''}
+                </div>`;
+                feed.prepend(cmdEl);
+            });
+
+            const el = document.createElement('div');
+            el.className = 'event-item turn-end';
+            el.innerHTML = `<div class="event-header">
+                <span class="event-title">✅ 回合 ${data.turn} 完成 (${cmds.length} 条命令)</span>
+                <span class="event-time">${fmtTime(data.timestamp)}</span>
+            </div>
+            <div class="event-snapshot">
+                <span class="snap-item">📅 ${snap.simTime ? snap.simTime.substring(0,10) : '--'}</span>
+                <span class="snap-item">💰 ${formatMoney(snap.fundsCents)}</span>
+                <span class="snap-item">📋 活跃${snap.activeTasks || 0} / 计划${snap.plannedTasks || 0}</span>
+                <span class="snap-item">👥 ${snap.employeeCount || 0}人</span>
+            </div>`;
+            feed.prepend(el);
+        }
+        trimFeed(feed);
+        if (data.terminal) {
+            updateActivityMeta({totalTurns: data.turn, simTime: snap.simTime, fundsCents: snap.fundsCents});
+        } else {
+            updateActivityMeta({turn: data.turn, simTime: snap.simTime, fundsCents: snap.fundsCents});
+        }
+    }
+
+    function appendActivityEvent(data) {
+        if (!data.status) return;
+        showActivityPanel();
+        const feed = document.getElementById('activity-feed');
+        const el = document.createElement('div');
+        el.className = 'event-item status-change';
+        const icon = {RUNNING:'🟢', COMPLETED:'🏁', ERROR:'❌', STOPPING:'⏸', IDLE:'⚪'}[data.status] || '📌';
+        el.innerHTML = `<div class="event-header">
+            <span class="event-title">${icon} ${data.message || data.status}</span>
+            <span class="event-time">${fmtTime(new Date().toISOString())}</span>
+        </div>`;
+        feed.prepend(el);
+        trimFeed(feed);
+
+        // 更新指示器状态
+        if (data.status === 'COMPLETED' || data.status === 'ERROR' || data.status === 'IDLE') {
+            hideActivityRunning();
+            const indicator = document.getElementById('activity-indicator');
+            indicator.textContent = data.status === 'COMPLETED' ? '✅' : data.status === 'ERROR' ? '❌' : '⚪';
+        }
+    }
+
+    function updateActivityMeta(info) {
+        if (info.totalTurns != null) {
+            document.getElementById('activity-turn').textContent = '总回合: ' + info.totalTurns;
+        } else if (info.turn != null) {
+            document.getElementById('activity-turn').textContent = '回合: ' + info.turn;
+        }
+        if (info.simTime) document.getElementById('activity-sim-time').textContent = '仿真时间: ' + info.simTime.substring(0, 10);
+        if (info.fundsCents != null) document.getElementById('activity-funds').textContent = '资金: ' + formatMoney(info.fundsCents);
+    }
+
+    function trimFeed(feed) {
+        while (feed.children.length > 200) feed.removeChild(feed.lastChild);
+    }
+
+    function fmtTime(ts) {
+        if (!ts) return '';
+        try { return new Date(ts).toLocaleTimeString(); } catch(e) { return ts; }
+    }
+
+    function initActivityClear() {
+        const btn = document.getElementById('btn-clear-log');
+        if (btn) btn.addEventListener('click', () => { document.getElementById('activity-feed').innerHTML = ''; });
     }
 
     // ============ Helpers ============

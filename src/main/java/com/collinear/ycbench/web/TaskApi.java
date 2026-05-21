@@ -97,7 +97,7 @@ public final class TaskApi {
         item.put("acceptedAt", t.acceptedAt != null ? t.acceptedAt.toString() : null);
         item.put("completedAt", t.completedAt != null ? t.completedAt.toString() : null);
         item.put("success", t.success);
-        item.put("progressMilestonePct", t.progressMilestonePct);
+        item.put("progressMilestonePct", computeProgress(db, t));
         item.put("marketSlot", t.marketSlot);
 
         if (t.clientId != null) {
@@ -108,5 +108,34 @@ public final class TaskApi {
             }
         }
         return item;
+    }
+
+    /** Compute real progress: completed=100%, failed=actual%, active/planned=from requirements */
+    private static int computeProgress(Connection db, Task t) throws Exception {
+        if (t.status == TaskStatus.COMPLETED_SUCCESS) return 100;
+        if (t.status == TaskStatus.COMPLETED_FAIL) {
+            // Failed tasks: compute actual progress from requirements
+            List<TaskRequirement> reqs = TaskDao.listRequirements(db, t.id);
+            if (reqs.isEmpty()) return 0;
+            double totalProgress = 0;
+            for (TaskRequirement r : reqs) {
+                if (r.requiredQty > 0) {
+                    totalProgress += Math.min(1.0, (double) r.completedQty / r.requiredQty);
+                }
+            }
+            return (int) Math.round(totalProgress / reqs.size() * 100);
+        }
+        if (t.status == TaskStatus.ACTIVE || t.status == TaskStatus.PLANNED) {
+            List<TaskRequirement> reqs = TaskDao.listRequirements(db, t.id);
+            if (reqs.isEmpty()) return 0;
+            double totalProgress = 0;
+            for (TaskRequirement r : reqs) {
+                if (r.requiredQty > 0) {
+                    totalProgress += Math.min(1.0, (double) r.completedQty / r.requiredQty);
+                }
+            }
+            return (int) Math.round(totalProgress / reqs.size() * 100);
+        }
+        return 0; // market tasks
     }
 }

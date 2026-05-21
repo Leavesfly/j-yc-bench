@@ -54,6 +54,20 @@ public final class RunCmdMain {
     private RunCmdMain() {
     }
 
+    /** 外部注入的额外回调（如 Web 实时广播） */
+    private static volatile AgentLoop.TurnHook externalTurnHook = null;
+    private static volatile AgentLoop.TurnStartHook externalTurnStartHook = null;
+
+    public static void setExternalHooks(AgentLoop.TurnStartHook startHook, AgentLoop.TurnHook turnHook) {
+        externalTurnStartHook = startHook;
+        externalTurnHook = turnHook;
+    }
+
+    public static void clearExternalHooks() {
+        externalTurnStartHook = null;
+        externalTurnHook = null;
+    }
+
     public static int run(RunArgs args) {
         // 传播到子进程 CLI 调用（镜像 Python 的 YC_BENCH_EXPERIMENT）。
         // 我们无法在进程中设置环境变量，但 ConfigLoader 通过系统属性获取此值。
@@ -134,11 +148,15 @@ public final class RunCmdMain {
                 appendTranscript(transcriptPath, snapshot, rs);
                 // 每次轮次后保存会话消息以进行崩溃恢复。
                 runtime.saveSessionMessages(sessionId, sessionMessagesPath);
+                // 调用外部回调（如 Web 实时广播）
+                if (externalTurnHook != null) {
+                    try { externalTurnHook.onTurn(snapshot, rs, commands); } catch (Exception ignored) {}
+                }
             };
 
             AgentLoop.run(runtime, companyId, runState, cmdExec,
                     cfg.loop.autoAdvanceAfterTurns, cfg.loop.maxTurns,
-                    null, onTurn, episode);
+                    externalTurnStartHook, onTurn, episode);
 
             if (args.maxEpisodes > 1) runState.finishEpisode();
             LOGGER.info("Episode " + episode + " finished: reason=" + runState.terminalReason);
