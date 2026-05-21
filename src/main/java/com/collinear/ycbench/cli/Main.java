@@ -1,6 +1,5 @@
-package com.collinear.ycbench;
+package com.collinear.ycbench.cli;
 
-import com.collinear.ycbench.cli.DotEnv;
 import com.collinear.ycbench.cli.commands.ClientCmd;
 import com.collinear.ycbench.cli.commands.CompanyCmd;
 import com.collinear.ycbench.cli.commands.EmployeeCmd;

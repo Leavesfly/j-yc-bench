@@ -1,6 +1,6 @@
 package com.collinear.ycbench.agent;
 
-import com.collinear.ycbench.Main;
+import com.collinear.ycbench.cli.Main;
 
 import java.io.BufferedReader;
 import java.io.IOException;
