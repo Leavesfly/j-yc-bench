@@ -84,6 +84,10 @@ java -jar target/j-yc-bench.jar web --db db/default_1_greedy_bot.db --port 3000
 - 🤝 **客户分析** — 信任度、RAT 识别标记
 - 💳 **财务流水** — 完整的收支明细
 
+**效果预览：**
+
+![Web Dashboard](docs/web-dashboard-screenshot.png)
+
 ### 🧠 LLM Agent 可视化演示
 
 直观看到 LLM 如何做出经营决策（需 Ollama）：
