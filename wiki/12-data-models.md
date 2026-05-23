@@ -84,6 +84,7 @@ public final class Task {
 ```
 
 **`TaskStatus`** 枚举：
+
 | 值 | 含义 |
 |----|------|
 | `MARKET` | 在市场上，可被接受 |
@@ -149,6 +150,7 @@ public final class SimEvent {
 ```
 
 **`EventType`** 枚举：
+
 | 值 | 含义 |
 |----|------|
 | `TASK_HALF_PROGRESS` | 任务到达进度里程碑 |
@@ -173,6 +175,7 @@ public final class LedgerEntry {
 ```
 
 **`LedgerCategory`** 枚举：
+
 | 值 | 含义 |
 |----|------|
 | `MONTHLY_PAYROLL` | 月度工资 |
@@ -254,4 +257,4 @@ task    ──N:M── employee (通过 task_assignment)
 ---
 
 > 想回到架构总览 → [11 - 系统架构](11-architecture.md)
-> 想回到 Wiki 首页 → [README](README.md)
+> > 想回到 Wiki 首页 → [README](README.md)
